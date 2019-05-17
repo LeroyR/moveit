@@ -72,6 +72,8 @@ private:
     owner_->setExecutionVelocityScaling(config.execution_velocity_scaling);
     owner_->setAllowedStartTolerance(config.allowed_start_tolerance);
     owner_->setWaitForTrajectoryCompletion(config.wait_for_trajectory_completion);
+    owner_->setTrajectoryStartTime_(config.trajectory_start_time);
+    owner_->setWaitForStopOnTrajectoryPartCompletion(config.wait_for_stop_on_trajectory_part_completion);
   }
 
   TrajectoryExecutionManager* owner_;
@@ -207,6 +209,16 @@ void TrajectoryExecutionManager::setAllowedStartTolerance(double tolerance)
 void TrajectoryExecutionManager::setWaitForTrajectoryCompletion(bool flag)
 {
   wait_for_trajectory_completion_ = flag;
+}
+
+void TrajectoryExecutionManager::setTrajectoryStartTime_(double time)
+{
+  trajectory_start_time_ = time;
+}
+
+void TrajectoryExecutionManager::setWaitForStopOnTrajectoryPartCompletion(bool flag)
+{
+  wait_for_stop_on_trajectory_part_completion_ = flag;
 }
 
 bool TrajectoryExecutionManager::isManagingControllers() const
@@ -1275,6 +1287,8 @@ void TrajectoryExecutionManager::executeThread(const ExecutionCompleteCallback& 
   for (; i < trajectories_.size(); ++i)
   {
     bool epart = executePart(i);
+    if (epart && wait_for_stop_on_trajectory_part_completion_)
+      waitForRobotToStop(*trajectories_[i]);
     if (epart && part_callback)
       part_callback(i);
     if (!epart || execution_complete_)
@@ -1282,6 +1296,7 @@ void TrajectoryExecutionManager::executeThread(const ExecutionCompleteCallback& 
       ++i;
       break;
     }
+    
   }
 
   // only report that execution finished successfully when the robot actually stopped moving
@@ -1351,6 +1366,19 @@ bool TrajectoryExecutionManager::executePart(std::size_t part_index)
         handles = active_handles_;  // keep a copy for later, to avoid thread safety issues
         for (std::size_t i = 0; i < context.trajectory_parts_.size(); ++i)
         {
+          // prefer controller-specific values over global ones if defined
+          // TODO: the controller-specific parameters are static, but override
+          //       the global ones are configurable via dynamic reconfigure
+          std::map<std::string, double>::const_iterator start_it =
+              controller_trajectory_start_time_.find(context.controllers_[i]);
+          const double current_time_add = start_it != controller_trajectory_start_time_.end() ?
+                                            start_it->second :
+                                            trajectory_start_time_;
+
+          for(std::size_t k = 0; k < context.trajectory_parts_[i].joint_trajectory.points.size(); ++k) {
+            context.trajectory_parts_[i].joint_trajectory.points[k].time_from_start += ros::Duration(current_time_add);
+          }
+
           bool ok = false;
           try
           {
@@ -1755,6 +1783,9 @@ void TrajectoryExecutionManager::loadControllerParams()
         if (controller.hasMember("allowed_goal_duration_margin"))
           controller_allowed_goal_duration_margin_[std::string(controller["name"])] =
               controller["allowed_goal_duration_margin"];
+        if(controller.hasMember("trajectory_start_time"))
+          controller_trajectory_start_time_[std::string(controller["name"])] =
+              controller["trajectory_start_time"];
       }
     }
   }
