@@ -243,6 +243,12 @@ public:
   /// Enable or disable waiting for trajectory completion
   void setWaitForTrajectoryCompletion(bool flag);
 
+  /// Set time to add to time_from_start for each trajectory step
+  void setTrajectoryStartTime_(double time);
+
+  /// Enable or disable waiting for stop after each trajectory part completion
+  void setWaitForStopOnTrajectoryPartCompletion(bool flag);
+
 private:
   struct ControllerInformation
   {
@@ -356,10 +362,16 @@ private:
   // override the 'global' values
   std::map<std::string, double> controller_allowed_execution_duration_scaling_;
   std::map<std::string, double> controller_allowed_goal_duration_margin_;
+  std::map<std::string, double> controller_trajectory_start_time_;
+
 
   double allowed_start_tolerance_;  // joint tolerance for validate(): radians for revolute joints
   double execution_velocity_scaling_;
   bool wait_for_trajectory_completion_;
+
+  double trajectory_start_time_{0.0};
+  bool wait_for_stop_on_trajectory_part_completion_{false};
+
 };
 }
 
