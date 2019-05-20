@@ -1516,8 +1516,21 @@ bool TrajectoryExecutionManager::executePart(std::size_t part_index)
       {
         result = false;
         break;
+      } else if ((handle->getLastExecutionStatus() == moveit_controller_manager::ExecutionStatus::RUNNING))
+      {
+        while((handle->getLastExecutionStatus() == moveit_controller_manager::ExecutionStatus::RUNNING) && (ros::Time::now() - current_time < expected_trajectory_duration))
+        {
+          ROS_WARN_STREAM_NAMED(name_, "Controller handle " << handle->getName() << " reports status "
+                                                          << handle->getLastExecutionStatus().asString());
+          if (execution_complete_)
+          {
+            result = false;
+            break;
+          }
+        }
       }
-      else if (handle->getLastExecutionStatus() != moveit_controller_manager::ExecutionStatus::SUCCEEDED)
+
+      if (handle->getLastExecutionStatus() != moveit_controller_manager::ExecutionStatus::SUCCEEDED)
       {
         ROS_WARN_STREAM_NAMED(name_, "Controller handle " << handle->getName() << " reports status "
                                                           << handle->getLastExecutionStatus().asString());
