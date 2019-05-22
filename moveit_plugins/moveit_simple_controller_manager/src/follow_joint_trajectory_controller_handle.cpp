@@ -39,7 +39,7 @@
 #include <moveit/utils/xmlrpc_casts.h>
 
 using namespace moveit::core;
-static const std::string LOGNAME("SimpleControllerManager");
+static const std::string LOGNAME("FollowJointTrajectoryControllerHandle");
 
 namespace moveit_simple_controller_manager
 {
